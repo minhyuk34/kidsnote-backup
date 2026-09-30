@@ -1,0 +1,42 @@
+# 키즈노트 백업 뒤에 실행: 놓치면 안 되는 공지를 골라 마감일/실행일을 노션에 채웁니다.
+# 필요한 시크릿: NOTION_TOKEN, NOTION_DATABASE_ID (미러와 동일). ANTHROPIC_API_KEY 는 선택(없으면 무료 규칙 방식).
+name: Extract must-see notices
+
+on:
+  workflow_run:
+    workflows: ["Kidsnote → Notion mirror"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      lookback_days:
+        description: "최근 N일 글만 분석"
+        default: "45"
+      max_items:
+        description: "한 번에 분석할 최대 글 수"
+        default: "30"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extract-actions
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Extract
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LOOKBACK_DAYS: ${{ inputs.lookback_days || '45' }}
+          MAX_ITEMS: ${{ inputs.max_items || '30' }}
+        run: python tools/extract_actions/extract_actions.py
